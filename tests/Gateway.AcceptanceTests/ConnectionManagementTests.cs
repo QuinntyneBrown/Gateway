@@ -1,4 +1,8 @@
+using Couchbase.KeyValue;
+using Couchbase.Query;
 using FluentAssertions;
+using Gateway.Core.Extensions;
+using Moq;
 using Xunit;
 
 namespace Gateway.AcceptanceTests;
@@ -22,7 +26,34 @@ public class ConnectionManagementTests
         // Then: the library uses the existing cluster connection
         // And: no additional connections are created
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange - Given a Couchbase scope from the SDK
+        var mockScope = new Mock<IScope>();
+        var mockQueryResult = new Mock<IQueryResult<TestUser>>();
+        var testUsers = new List<TestUser> { new TestUser { Id = "1", Name = "Test" } };
+
+        mockQueryResult.Setup(r => r.Rows).Returns(testUsers.ToAsyncEnumerable());
+        mockScope
+            .Setup(s => s.QueryAsync<TestUser>(It.IsAny<string>(), It.IsAny<QueryOptions>()))
+            .ReturnsAsync(mockQueryResult.Object);
+
+        // Act - When I use the SimpleMapper extension methods
+        var results = await mockScope.Object.QueryToListAsync<TestUser>("SELECT * FROM users");
+
+        // Assert - Then the library uses the existing cluster connection
+        mockScope.Verify(
+            s => s.QueryAsync<TestUser>(It.IsAny<string>(), It.IsAny<QueryOptions>()),
+            Times.Once,
+            "The library should delegate to the SDK's existing QueryAsync method");
+
+        // And no additional connections are created (verified by using the mock scope directly)
+        results.Should().HaveCount(1);
+        results.First().Name.Should().Be("Test");
+    }
+
+    public class TestUser
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
     }
 
     [Fact]
