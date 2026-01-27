@@ -80,6 +80,24 @@ dotnet test --filter "DisplayName~Filter"
 ❌ **All 214 tests fail (as expected in Red phase)**  
 🔄 **Ready for implementation to begin**
 
+## Important Notes
+
+### Special Test Cases
+Some tests in this suite verify requirements that aren't traditional runtime behavior tests:
+
+- **Compile-time safety tests** (e.g., FilterBuilderTests.CompileTimeErrorForInvalidProperty): These verify type safety through IDE/compiler support. They should be documented rather than runtime-tested, or verified through Roslyn analyzers.
+  
+- **API surface tests** (e.g., ConnectionManagementTests checking for extension methods): These verify API availability and should be complemented with actual usage tests.
+
+- **Implementation detail tests** (e.g., PerformanceTests checking for compiled delegates): These verify internal implementation choices from requirements and may need alternative verification strategies like code reviews or benchmarks.
+
+When implementing these tests, consider:
+1. For compile-time checks: Document the expected behavior and/or use Roslyn analyzers
+2. For API surface checks: Supplement with actual usage scenarios  
+3. For performance/implementation checks: Use profiling tools and benchmarks instead of or in addition to unit tests
+
+These special cases are included because they represent actual requirements from the specification document, even though they may not be ideal as runtime acceptance tests.
+
 ## Next Steps
 
 1. Implement SimpleMapper library features
