@@ -93,13 +93,17 @@ public static class ScopeExtensions
     /// </summary>
     /// <typeparam name="T">The type to map results to</typeparam>
     /// <param name="scope">The Couchbase scope</param>
-    /// <param name="baseQuery">The base SQL++ query (e.g., "SELECT * FROM `users`")</param>
-    /// <param name="filter">The filter builder with conditions, sorting, and pagination</param>
+    /// <param name="baseQuery">The base SQL++ query. Must start with "SELECT *" for count query to work correctly.</param>
+    /// <param name="filter">The filter builder with conditions and sorting. Note: This filter will be modified by adding Skip/Take.</param>
     /// <param name="pageNumber">The page number (1-based)</param>
     /// <param name="pageSize">The number of items per page</param>
     /// <param name="includeTotalCount">Whether to execute a separate COUNT query for total count</param>
     /// <param name="options">Optional query options</param>
     /// <returns>A PagedResult containing the page items and metadata</returns>
+    /// <remarks>
+    /// The filter parameter will be modified by this method to add pagination (Skip/Take).
+    /// If you need to reuse the filter, create a new instance before calling this method.
+    /// </remarks>
     public static async Task<PagedResult<T>> GetPageAsync<T>(
         this IScope scope,
         string baseQuery,
@@ -125,10 +129,7 @@ public static class ScopeExtensions
         // Add filter parameters to query options
         foreach (var param in filter.Parameters)
         {
-            if (param.Value != null)
-            {
-                queryOptions.Parameter(param.Key, param.Value);
-            }
+            queryOptions.Parameter(param.Key, param.Value ?? string.Empty);
         }
 
         // Execute queries
@@ -139,29 +140,25 @@ public static class ScopeExtensions
         {
             // Build count query - use WHERE clause but no ORDER BY, LIMIT, or OFFSET
             var whereClause = filter.BuildWhereClause();
+            
+            // Simple replacement - requires baseQuery to start with "SELECT *"
+            if (!baseQuery.TrimStart().StartsWith("SELECT *", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("baseQuery must start with 'SELECT *' when includeTotalCount is true", nameof(baseQuery));
+            }
+            
             var countQuery = string.IsNullOrEmpty(whereClause) 
-                ? $"{baseQuery.Replace("SELECT *", "SELECT COUNT(*) as count")}"
-                : $"{baseQuery.Replace("SELECT *", "SELECT COUNT(*) as count")} WHERE {whereClause}";
+                ? $"{baseQuery.Replace("SELECT *", "SELECT COUNT(*) as count", StringComparison.OrdinalIgnoreCase)}"
+                : $"{baseQuery.Replace("SELECT *", "SELECT COUNT(*) as count", StringComparison.OrdinalIgnoreCase)} WHERE {whereClause}";
             
             var countOptions = new QueryOptions();
             foreach (var param in filter.Parameters)
             {
-                if (param.Value != null)
-                {
-                    countOptions.Parameter(param.Key, param.Value);
-                }
+                countOptions.Parameter(param.Key, param.Value ?? string.Empty);
             }
             
-            countTask = Task.Run(async () =>
-            {
-                var result = await scope.QueryAsync<Dictionary<string, object>>(countQuery, countOptions);
-                var countResult = await result.Rows.FirstOrDefaultAsync();
-                if (countResult != null && countResult.TryGetValue("count", out var countValue))
-                {
-                    return Convert.ToInt32(countValue);
-                }
-                return 0;
-            });
+            // Execute count query asynchronously (no Task.Run needed - already async)
+            countTask = ExecuteCountQueryAsync(scope, countQuery, countOptions);
 
             // Execute both queries in parallel
             await Task.WhenAll(dataTask, countTask);
@@ -171,9 +168,20 @@ public static class ScopeExtensions
             await dataTask;
         }
 
-        var items = await dataTask;
-        var totalCount = countTask != null ? await countTask : (int?)null;
+        var items = dataTask.Result; // Task is already completed, safe to use Result
+        var totalCount = countTask?.Result; // Task is already completed if not null
 
         return new PagedResult<T>(items, pageNumber, pageSize, totalCount);
+    }
+
+    private static async Task<int> ExecuteCountQueryAsync(IScope scope, string countQuery, QueryOptions options)
+    {
+        var result = await scope.QueryAsync<Dictionary<string, object>>(countQuery, options);
+        var countResult = await result.Rows.FirstOrDefaultAsync();
+        if (countResult != null && countResult.TryGetValue("count", out var countValue))
+        {
+            return Convert.ToInt32(countValue);
+        }
+        return 0;
     }
 }

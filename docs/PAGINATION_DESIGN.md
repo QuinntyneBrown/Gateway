@@ -50,12 +50,24 @@ public static async Task<PagedResult<T>> GetPageAsync<T>(
 | Parameter | Type | Description | Validation |
 |-----------|------|-------------|------------|
 | `scope` | `IScope` | Couchbase scope for query execution | Required (extension target) |
-| `baseQuery` | `string` | Base SQL++ query (e.g., `"SELECT * FROM \`users\`"`) | Required |
-| `filter` | `FilterBuilder<T>` | Filter with WHERE conditions and ORDER BY | Required |
+| `baseQuery` | `string` | Base SQL++ query - **must start with "SELECT *"** | Required, validated when includeTotalCount=true |
+| `filter` | `FilterBuilder<T>` | Filter with WHERE conditions and ORDER BY. **Note: Will be modified by adding Skip/Take** | Required |
 | `pageNumber` | `int` | Page number (1-based) | Must be ≥ 1 |
 | `pageSize` | `int` | Number of items per page | Must be ≥ 1 |
 | `includeTotalCount` | `bool` | Whether to execute COUNT query | Default: false |
 | `options` | `QueryOptions?` | Optional Couchbase query options | Optional |
+
+### Important Notes
+
+1. **Filter Mutation**: The `filter` parameter will be modified by this method (Skip/Take are added). If you need to reuse the filter object, create a new instance before calling GetPageAsync.
+
+2. **Base Query Format**: When `includeTotalCount` is true, the `baseQuery` must start with "SELECT *" (case-insensitive). This is required for the count query to work correctly. Examples:
+   - ✅ Valid: `"SELECT * FROM \`users\`"`
+   - ✅ Valid: `"select * FROM \`products\`"`
+   - ❌ Invalid: `"SELECT u.* FROM \`users\` u"`
+   - ❌ Invalid: `"SELECT DISTINCT * FROM \`items\`"`
+
+3. **Null Parameters**: Parameter values will be converted to empty string if null (Couchbase requirement).
 
 ### Return Type
 
