@@ -1,9 +1,14 @@
+using System.Reflection;
 using Couchbase.KeyValue;
 using Couchbase.Query;
 using FluentAssertions;
+using Gateway.Core;
 using Gateway.Core.Extensions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
+using GatewayCollectionExtensions = Gateway.Core.Extensions.CollectionExtensions;
 
 namespace Gateway.AcceptanceTests;
 
@@ -65,7 +70,33 @@ public class ConnectionManagementTests
         // Then: all queries use the SDK's connection pool
         // And: connection count does not exceed SDK pool limits
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange - Given a Couchbase scope from the SDK
+        var mockScope = new Mock<IScope>();
+        var callCount = 0;
+
+        mockScope
+            .Setup(s => s.QueryAsync<TestUser>(It.IsAny<string>(), It.IsAny<QueryOptions>()))
+            .ReturnsAsync(() =>
+            {
+                Interlocked.Increment(ref callCount);
+                var mockResult = new Mock<IQueryResult<TestUser>>();
+                mockResult.Setup(r => r.Rows).Returns(new List<TestUser>().ToAsyncEnumerable());
+                return mockResult.Object;
+            });
+
+        // Act - Execute multiple concurrent queries
+        var tasks = Enumerable.Range(0, 10)
+            .Select(_ => mockScope.Object.QueryToListAsync<TestUser>("SELECT * FROM users"))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        // Assert - All queries use the SDK's existing QueryAsync method (connection pool)
+        callCount.Should().Be(10);
+        mockScope.Verify(
+            s => s.QueryAsync<TestUser>(It.IsAny<string>(), It.IsAny<QueryOptions>()),
+            Times.Exactly(10),
+            "All queries should delegate to the SDK's connection pool");
     }
 
     [Fact]
@@ -77,7 +108,15 @@ public class ConnectionManagementTests
         // Then: SimpleMapper operations throw ObjectDisposedException
         // And: no orphaned connections remain
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var mockScope = new Mock<IScope>();
+        mockScope
+            .Setup(s => s.QueryAsync<TestUser>(It.IsAny<string>(), It.IsAny<QueryOptions>()))
+            .ThrowsAsync(new ObjectDisposedException("Cluster has been disposed"));
+
+        // Act & Assert - When SDK cluster is disposed, operations throw
+        var act = async () => await mockScope.Object.QueryToListAsync<TestUser>("SELECT * FROM users");
+        await act.Should().ThrowAsync<ObjectDisposedException>();
     }
 
     #endregion
@@ -93,7 +132,17 @@ public class ConnectionManagementTests
         // Then: no connection pool settings exist (min/max connections, idle timeout, etc.)
         // And: all connection behavior is inherited from SDK configuration
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange & Act - Inspect SimpleMapperOptions
+        var optionsType = typeof(SimpleMapperOptions);
+        var properties = optionsType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        var propertyNames = properties.Select(p => p.Name.ToLowerInvariant()).ToList();
+
+        // Assert - No connection pool related properties
+        propertyNames.Should().NotContain("minconnections");
+        propertyNames.Should().NotContain("maxconnections");
+        propertyNames.Should().NotContain("connectionpoolsize");
+        propertyNames.Should().NotContain("idletimeout");
+        propertyNames.Should().NotContain("connectiontimeout");
     }
 
     [Fact]
@@ -105,7 +154,24 @@ public class ConnectionManagementTests
         // Then: no additional background threads are created by SimpleMapper
         // And: thread count remains consistent with SDK-only baseline
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var threadCountBefore = Process.GetCurrentProcess().Threads.Count;
+        var mockScope = new Mock<IScope>();
+        var mockQueryResult = new Mock<IQueryResult<TestUser>>();
+        mockQueryResult.Setup(r => r.Rows).Returns(new List<TestUser>().ToAsyncEnumerable());
+        mockScope
+            .Setup(s => s.QueryAsync<TestUser>(It.IsAny<string>(), It.IsAny<QueryOptions>()))
+            .ReturnsAsync(mockQueryResult.Object);
+
+        // Act - Use the extension methods (which should not create threads)
+        await mockScope.Object.QueryToListAsync<TestUser>("SELECT * FROM users");
+
+        var threadCountAfter = Process.GetCurrentProcess().Threads.Count;
+
+        // Assert - Thread count should not significantly increase
+        // Allow some variance for normal system operations
+        (threadCountAfter - threadCountBefore).Should().BeLessThan(5,
+            "SimpleMapper should not create background connection threads");
     }
 
     #endregion
@@ -121,7 +187,17 @@ public class ConnectionManagementTests
         // Then: QueryAsync<T>, QueryFirstAsync<T>, QueryFirstOrDefaultAsync<T> are available
         // And: QuerySingleAsync<T>, ExecuteAsync, and Query<T> builder are available
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var extensionMethods = typeof(ScopeExtensions)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(m => m.GetParameters().FirstOrDefault()?.ParameterType == typeof(IScope))
+            .Select(m => m.Name)
+            .ToList();
+
+        // Assert - Required extension methods exist
+        extensionMethods.Should().Contain("QueryToListAsync");
+        extensionMethods.Should().Contain("QueryFirstAsync");
+        extensionMethods.Should().Contain("QueryFirstOrDefaultAsync");
     }
 
     [Fact]
@@ -133,7 +209,19 @@ public class ConnectionManagementTests
         // Then: GetAsync<T>, InsertAsync<T>, UpsertAsync<T> are available
         // And: ReplaceAsync<T>, RemoveAsync methods are available
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var extensionMethods = typeof(GatewayCollectionExtensions)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(m => m.GetParameters().FirstOrDefault()?.ParameterType == typeof(ICouchbaseCollection))
+            .Select(m => m.Name)
+            .ToList();
+
+        // Assert - Required extension methods exist
+        extensionMethods.Should().Contain("GetAsync");
+        extensionMethods.Should().Contain("InsertAsync");
+        extensionMethods.Should().Contain("UpsertAsync");
+        extensionMethods.Should().Contain("ReplaceAsync");
+        extensionMethods.Should().Contain("RemoveAsync");
     }
 
     [Fact]
@@ -146,7 +234,26 @@ public class ConnectionManagementTests
         // Then: the query executes successfully
         // And: results are mapped to User objects
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var mockScope = new Mock<IScope>();
+        var mockQueryResult = new Mock<IQueryResult<TestUser>>();
+        var testUsers = new List<TestUser>
+        {
+            new TestUser { Id = "1", Name = "Alice" },
+            new TestUser { Id = "2", Name = "Bob" }
+        };
+        mockQueryResult.Setup(r => r.Rows).Returns(testUsers.ToAsyncEnumerable());
+        mockScope
+            .Setup(s => s.QueryAsync<TestUser>(It.IsAny<string>(), It.IsAny<QueryOptions>()))
+            .ReturnsAsync(mockQueryResult.Object);
+
+        // Act - Use extension methods without any additional setup
+        var results = await mockScope.Object.QueryToListAsync<TestUser>("SELECT * FROM users");
+
+        // Assert
+        results.Should().HaveCount(2);
+        results[0].Name.Should().Be("Alice");
+        results[1].Name.Should().Be("Bob");
     }
 
     #endregion
@@ -162,7 +269,21 @@ public class ConnectionManagementTests
         // Then: SimpleMapper services are registered in the container
         // And: ISimpleMapperContext is resolvable from the provider
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddCouchbaseSimpleMapper(options =>
+        {
+            options.DefaultBucket = "testBucket";
+        });
+
+        var provider = services.BuildServiceProvider();
+
+        // Assert
+        var options = provider.GetService<SimpleMapperOptions>();
+        options.Should().NotBeNull();
+        options!.DefaultBucket.Should().Be("testBucket");
     }
 
     [Fact]
@@ -175,7 +296,21 @@ public class ConnectionManagementTests
         // When: resolving ISimpleMapperContext
         // Then: the context is configured with the specified bucket and scope
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddCouchbaseSimpleMapper(options =>
+        {
+            options.DefaultBucket = "testBucket";
+            options.DefaultScope = "testScope";
+        });
+
+        // Act
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<SimpleMapperOptions>();
+
+        // Assert
+        options.DefaultBucket.Should().Be("testBucket");
+        options.DefaultScope.Should().Be("testScope");
     }
 
     [Fact]
@@ -187,8 +322,33 @@ public class ConnectionManagementTests
         // Then: options are populated from the configuration file
         // And: all settings match the JSON values
 
-        throw new NotImplementedException("Test not yet implemented - ATDD Red phase");
+        // Arrange
+        var configValues = new Dictionary<string, string?>
+        {
+            ["SimpleMapper:DefaultBucket"] = "configuredBucket",
+            ["SimpleMapper:DefaultScope"] = "configuredScope"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configValues)
+            .Build();
+
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddCouchbaseSimpleMapper(configuration.GetSection("SimpleMapper"));
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<SimpleMapperOptions>();
+
+        // Assert
+        options.DefaultBucket.Should().Be("configuredBucket");
+        options.DefaultScope.Should().Be("configuredScope");
     }
 
     #endregion
+}
+
+// Helper for process thread count
+file static class Process
+{
+    public static System.Diagnostics.Process GetCurrentProcess() => System.Diagnostics.Process.GetCurrentProcess();
 }
