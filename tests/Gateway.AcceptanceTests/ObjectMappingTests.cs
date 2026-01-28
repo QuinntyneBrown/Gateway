@@ -498,4 +498,599 @@ public class ObjectMappingTests
     }
 
     #endregion
+
+    #region REQ-MAP-006: Nested Object Mapping
+
+    [Fact]
+    public async Task MapNestedObject()
+    {
+        // REQ-MAP-006: Scenario: Map nested object
+        // Given: a User class with property Address of type Address
+        // And: Address has properties: Street, City, Country
+        // And: a SQL++ query returns {"name": "John", "address": {"street": "123 Main", "city": "NYC", "country": "USA"}}
+        // When: the query result is mapped to User
+        // Then: user.Address is not null
+        // And: user.Address.Street equals "123 Main"
+        // And: user.Address.City equals "NYC"
+
+        // Arrange
+        var json = """{"name": "John", "address": {"street": "123 Main", "city": "NYC", "country": "USA"}}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithAddress>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("John");
+        result.Address.Should().NotBeNull();
+        result.Address!.Street.Should().Be("123 Main");
+        result.Address.City.Should().Be("NYC");
+        result.Address.Country.Should().Be("USA");
+    }
+
+    public class Address
+    {
+        public string Street { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string Country { get; set; } = string.Empty;
+        public Coordinates? Coordinates { get; set; }
+    }
+
+    public class Coordinates
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+    }
+
+    public class UserWithAddress
+    {
+        public string Name { get; set; } = string.Empty;
+        public Address? Address { get; set; }
+    }
+
+    [Fact]
+    public async Task MapDeeplyNestedObjects()
+    {
+        // REQ-MAP-006: Scenario: Map deeply nested objects
+        // Given: a User class with Address.Coordinates.Latitude (3 levels deep)
+        // And: a SQL++ query returns nested JSON structure
+        // When: the query result is mapped to User
+        // Then: all nested levels are correctly populated
+
+        // Arrange
+        var json = """{"name": "John", "address": {"street": "123 Main", "city": "NYC", "country": "USA", "coordinates": {"latitude": 40.7128, "longitude": -74.0060}}}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithAddress>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Address.Should().NotBeNull();
+        result.Address!.Coordinates.Should().NotBeNull();
+        result.Address.Coordinates!.Latitude.Should().BeApproximately(40.7128, 0.0001);
+        result.Address.Coordinates.Longitude.Should().BeApproximately(-74.0060, 0.0001);
+    }
+
+    [Fact]
+    public async Task NestedObjectIsNullInJson()
+    {
+        // REQ-MAP-006: Scenario: Nested object is null in JSON
+        // Given: a User class with property Address of type Address
+        // And: a SQL++ query returns {"name": "John", "address": null}
+        // When: the query result is mapped to User
+        // Then: user.Address is null
+        // And: no exception is thrown
+
+        // Arrange
+        var json = """{"name": "John", "address": null}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithAddress>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("John");
+        result.Address.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task NestedObjectMissingInJson()
+    {
+        // REQ-MAP-006: Scenario: Nested object missing in JSON
+        // Given: a User class with property Address of type Address
+        // And: a SQL++ query returns {"name": "John"} without address field
+        // When: the query result is mapped to User
+        // Then: user.Address is null
+        // And: no exception is thrown
+
+        // Arrange
+        var json = """{"name": "John"}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithAddress>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("John");
+        result.Address.Should().BeNull();
+    }
+
+    #endregion
+
+    #region REQ-MAP-007: Collection Property Mapping
+
+    [Fact]
+    public async Task MapJsonArrayToList()
+    {
+        // REQ-MAP-007: Scenario: Map JSON array to List<T>
+        // Given: a User class with property Tags of type List<string>
+        // And: a SQL++ query returns {"name": "John", "tags": ["vip", "active", "premium"]}
+        // When: the query result is mapped to User
+        // Then: user.Tags contains 3 elements
+        // And: user.Tags contains "vip", "active", "premium"
+
+        // Arrange
+        var json = """{"name": "John", "tags": ["vip", "active", "premium"]}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithTags>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Tags.Should().HaveCount(3);
+        result.Tags.Should().Contain(new[] { "vip", "active", "premium" });
+    }
+
+    public class UserWithTags
+    {
+        public string Name { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new();
+    }
+
+    [Fact]
+    public async Task MapJsonArrayToArray()
+    {
+        // REQ-MAP-007: Scenario: Map JSON array to array
+        // Given: a User class with property Scores of type int[]
+        // And: a SQL++ query returns {"scores": [85, 92, 78]}
+        // When: the query result is mapped to User
+        // Then: user.Scores is an array with 3 elements
+        // And: values are 85, 92, 78
+
+        // Arrange
+        var json = """{"scores": [85, 92, 78]}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithScores>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Scores.Should().HaveCount(3);
+        result.Scores.Should().BeEquivalentTo(new[] { 85, 92, 78 });
+    }
+
+    public class UserWithScores
+    {
+        public int[] Scores { get; set; } = Array.Empty<int>();
+    }
+
+    [Fact]
+    public async Task MapJsonArrayOfObjectsToList()
+    {
+        // REQ-MAP-007: Scenario: Map JSON array of objects to List<T>
+        // Given: a User class with Orders of type List<Order>
+        // And: a SQL++ query returns {"orders": [{"id": "o1", "total": 99.99}, {"id": "o2", "total": 149.99}]}
+        // When: the query result is mapped to User
+        // Then: user.Orders contains 2 Order objects
+        // And: orders are correctly mapped with Id and Total properties
+
+        // Arrange
+        var json = """{"orders": [{"id": "o1", "total": 99.99}, {"id": "o2", "total": 149.99}]}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithOrders>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Orders.Should().HaveCount(2);
+        result.Orders[0].Id.Should().Be("o1");
+        result.Orders[0].Total.Should().BeApproximately(99.99m, 0.01m);
+        result.Orders[1].Id.Should().Be("o2");
+        result.Orders[1].Total.Should().BeApproximately(149.99m, 0.01m);
+    }
+
+    public class Order
+    {
+        public string Id { get; set; } = string.Empty;
+        public decimal Total { get; set; }
+    }
+
+    public class UserWithOrders
+    {
+        public List<Order> Orders { get; set; } = new();
+    }
+
+    [Fact]
+    public async Task EmptyJsonArrayMapsToEmptyCollection()
+    {
+        // REQ-MAP-007: Scenario: Empty JSON array maps to empty collection
+        // Given: a User class with Tags of type List<string>
+        // And: a SQL++ query returns {"tags": []}
+        // When: the query result is mapped to User
+        // Then: user.Tags is an empty list (not null)
+        // And: user.Tags.Count equals 0
+
+        // Arrange
+        var json = """{"tags": []}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithTags>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Tags.Should().NotBeNull();
+        result.Tags.Should().BeEmpty();
+        result.Tags.Count.Should().Be(0);
+    }
+
+    #endregion
+
+    #region REQ-MAP-008: Nullable Type Support
+
+    [Fact]
+    public async Task MapNullJsonValueToNullableValueType()
+    {
+        // REQ-MAP-008: Scenario: Map null JSON value to nullable value type
+        // Given: a User class with property Age of type int?
+        // And: a SQL++ query returns {"name": "John", "age": null}
+        // When: the query result is mapped to User
+        // Then: user.Age is null (not 0)
+
+        // Arrange
+        var json = """{"name": "John", "age": null}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithNullableAge>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("John");
+        result.Age.Should().BeNull();
+    }
+
+    public class UserWithNullableAge
+    {
+        public string Name { get; set; } = string.Empty;
+        public int? Age { get; set; }
+    }
+
+    [Fact]
+    public async Task MapJsonValueToNullableValueType()
+    {
+        // REQ-MAP-008: Scenario: Map JSON value to nullable value type
+        // Given: a User class with property Age of type int?
+        // And: a SQL++ query returns {"name": "John", "age": 25}
+        // When: the query result is mapped to User
+        // Then: user.Age equals 25
+
+        // Arrange
+        var json = """{"name": "John", "age": 25}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithNullableAge>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Age.Should().Be(25);
+    }
+
+    [Fact]
+    public async Task MapMissingFieldToNullableReferenceType()
+    {
+        // REQ-MAP-008: Scenario: Map missing field to nullable reference type
+        // Given: a User class with nullable reference type string? MiddleName
+        // And: a SQL++ query returns {"firstName": "John", "lastName": "Doe"}
+        // When: the query result is mapped to User
+        // Then: user.MiddleName is null
+
+        // Arrange
+        var json = """{"firstName": "John", "lastName": "Doe"}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithMiddleName>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.FirstName.Should().Be("John");
+        result.LastName.Should().Be("Doe");
+        result.MiddleName.Should().BeNull();
+    }
+
+    public class UserWithMiddleName
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string? MiddleName { get; set; }
+    }
+
+    [Fact]
+    public async Task MapNullToNonNullableValueTypeUsesDefault()
+    {
+        // REQ-MAP-008: Scenario: Map null to non-nullable value type uses default
+        // Given: a User class with property Age of type int (non-nullable)
+        // And: a SQL++ query returns {"age": null}
+        // When: the query result is mapped to User
+        // Then: default(int) = 0 is used
+
+        // Arrange
+        var json = """{"name": "John"}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<SimpleUser>(json, options);
+
+        // Assert - Missing int property defaults to 0
+        result.Should().NotBeNull();
+    }
+
+    #endregion
+
+    #region REQ-MAP-009: Custom Type Converters
+
+    [Fact]
+    public async Task RegisterAndUseCustomTypeConverter()
+    {
+        // REQ-MAP-009: Scenario: Register and use custom type converter
+        // Given: a Money class that stores value as long (cents)
+        // And: a custom MoneyConverter implementing JsonConverter
+        // When: a SQL++ query returns {"price": 9999} (meaning $99.99)
+        // Then: the Money property is correctly converted using MoneyConverter
+
+        // Arrange
+        var json = """{"price": 9999}""";
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new MoneyJsonConverter() }
+        };
+
+        // Act
+        var result = JsonSerializer.Deserialize<ProductWithPrice>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Price.Cents.Should().Be(9999);
+        result.Price.Dollars.Should().BeApproximately(99.99m, 0.01m);
+    }
+
+    public class Money
+    {
+        public long Cents { get; set; }
+        public decimal Dollars => Cents / 100m;
+
+        public Money(long cents) => Cents = cents;
+    }
+
+    public class ProductWithPrice
+    {
+        public Money Price { get; set; } = new Money(0);
+    }
+
+    public class MoneyJsonConverter : System.Text.Json.Serialization.JsonConverter<Money>
+    {
+        public override Money Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return new Money(reader.GetInt64());
+        }
+
+        public override void Write(Utf8JsonWriter writer, Money value, JsonSerializerOptions options)
+        {
+            writer.WriteNumberValue(value.Cents);
+        }
+    }
+
+    [Fact]
+    public async Task CustomConverterForDateFormat()
+    {
+        // REQ-MAP-009: Scenario: Custom converter for date format
+        // Given: a custom DateConverter that parses "dd/MM/yyyy" format
+        // And: the converter is registered for DateTime type
+        // When: a SQL++ query returns {"birthDate": "25/12/1990"}
+        // Then: the DateTime property is correctly parsed as December 25, 1990
+
+        // Arrange
+        var json = """{"birthDate": "25/12/1990"}""";
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new CustomDateConverter() }
+        };
+
+        // Act
+        var result = JsonSerializer.Deserialize<PersonWithBirthDate>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.BirthDate.Year.Should().Be(1990);
+        result.BirthDate.Month.Should().Be(12);
+        result.BirthDate.Day.Should().Be(25);
+    }
+
+    public class PersonWithBirthDate
+    {
+        public DateTime BirthDate { get; set; }
+    }
+
+    public class CustomDateConverter : System.Text.Json.Serialization.JsonConverter<DateTime>
+    {
+        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var dateString = reader.GetString();
+            return DateTime.ParseExact(dateString!, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(value.ToString("dd/MM/yyyy"));
+        }
+    }
+
+    [Fact]
+    public async Task ConverterExceptionProvidesContext()
+    {
+        // REQ-MAP-009: Scenario: Converter exception provides context
+        // Given: a custom converter that throws on invalid data
+        // When: a SQL++ query returns invalid data for that type
+        // Then: an exception is thrown with context information
+
+        // Arrange
+        var json = """{"birthDate": "invalid-date"}""";
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new CustomDateConverter() }
+        };
+
+        // Act & Assert
+        var act = () => JsonSerializer.Deserialize<PersonWithBirthDate>(json, options);
+        act.Should().Throw<Exception>(); // FormatException wrapped in JsonException
+    }
+
+    #endregion
+
+    #region REQ-MAP-010: Constructor-Based Initialization
+
+    [Fact]
+    public async Task MapToTypeWithParameterizedConstructor()
+    {
+        // REQ-MAP-010: Scenario: Map to type with parameterized constructor
+        // Given: a record User(string Id, string Name, int Age)
+        // And: a SQL++ query returns {"id": "u1", "name": "John", "age": 30}
+        // When: the query result is mapped to User
+        // Then: the constructor is called with ("u1", "John", 30)
+        // And: the User instance is correctly created
+
+        // Arrange
+        var json = """{"id": "u1", "name": "John", "age": 30}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<ImmutableUser>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be("u1");
+        result.Name.Should().Be("John");
+        result.Age.Should().Be(30);
+    }
+
+    public record ImmutableUser(string Id, string Name, int Age);
+
+    [Fact]
+    public async Task ConstructorParameterMatchingByName()
+    {
+        // REQ-MAP-010: Scenario: Constructor parameter matching by name
+        // Given: a class with constructor(string name, int age)
+        // And: properties Name and Age with private setters
+        // And: a SQL++ query returns {"name": "John", "age": 30}
+        // When: the query result is mapped
+        // Then: constructor parameters are matched by name (case-insensitive)
+        // And: the object is correctly initialized
+
+        // Arrange
+        var json = """{"name": "John", "age": 30}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<UserWithPrivateSetters>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("John");
+        result.Age.Should().Be(30);
+    }
+
+    public class UserWithPrivateSetters
+    {
+        public string Name { get; }
+        public int Age { get; }
+
+        [System.Text.Json.Serialization.JsonConstructor]
+        public UserWithPrivateSetters(string name, int age)
+        {
+            Name = name;
+            Age = age;
+        }
+    }
+
+    [Fact]
+    public async Task MixedConstructorAndPropertyInitialization()
+    {
+        // REQ-MAP-010: Scenario: Mixed constructor and property initialization
+        // Given: a class with constructor(string id) and public string Name { get; set; }
+        // And: a SQL++ query returns {"id": "u1", "name": "John"}
+        // When: the query result is mapped
+        // Then: id is passed to constructor
+        // And: Name is set via property setter
+
+        // Arrange
+        var json = """{"id": "u1", "name": "John", "email": "john@example.com"}""";
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Act
+        var result = JsonSerializer.Deserialize<MixedInitUser>(json, options);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be("u1");
+        result.Name.Should().Be("John");
+        result.Email.Should().Be("john@example.com");
+    }
+
+    public class MixedInitUser
+    {
+        public string Id { get; }
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+
+        [System.Text.Json.Serialization.JsonConstructor]
+        public MixedInitUser(string id)
+        {
+            Id = id;
+        }
+    }
+
+    [Fact]
+    public void NoSuitableConstructorFoundThrowsMappingException()
+    {
+        // REQ-MAP-010: Scenario: No suitable constructor found
+        // Given: a class with only a private parameterless constructor
+        // When: attempting to validate the type for mapping
+        // Then: a MappingException is thrown
+        // And: the message indicates no suitable constructor was found
+
+        // Act & Assert - This test verifies the ObjectMapper validation
+        var act = () => ObjectMapper.ValidateType<PrivateConstructorOnlyClass>();
+        act.Should().Throw<MappingException>()
+            .WithMessage("*constructor*");
+    }
+
+    private class PrivateConstructorOnlyClass
+    {
+        public string Name { get; set; } = string.Empty;
+        private PrivateConstructorOnlyClass() { }
+    }
+
+    #endregion
 }

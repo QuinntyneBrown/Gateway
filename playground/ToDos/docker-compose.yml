@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  couchbase:
+    image: couchbase:community-7.6.1
+    container_name: todos-couchbase
+    ports:
+      - "8091-8096:8091-8096"   # Web console & REST API
+      - "11210-11211:11210-11211" # Data service
+    environment:
+      - COUCHBASE_ADMINISTRATOR_USERNAME=Administrator
+      - COUCHBASE_ADMINISTRATOR_PASSWORD=password
+    volumes:
+      - couchbase-data:/opt/couchbase/var
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/pools"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - todos-network
+
+  todos-api:
+    build:
+      context: ../..
+      dockerfile: playground/ToDos/src/ToDos.Api/Dockerfile
+    container_name: todos-api
+    ports:
+      - "5000:8080"
+      - "5001:8081"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+      - Couchbase__ConnectionString=couchbase://couchbase
+      - Couchbase__Username=Administrator
+      - Couchbase__Password=password
+      - Couchbase__BucketName=todos
+    depends_on:
+      couchbase:
+        condition: service_healthy
+    networks:
+      - todos-network
+    restart: unless-stopped
+
+volumes:
+  couchbase-data:
+
+networks:
+  todos-network:
+    driver: bridge
