@@ -74,7 +74,32 @@ await collection.ReplaceAsync("user::456", updatedUser);
 await collection.RemoveAsync("user::456");
 ```
 
-### 4. Pagination
+### 4. Pagination with GetPageAsync
+
+```csharp
+// Build filter with conditions and sorting
+var filter = new FilterBuilder<User>();
+filter.Where("status", "active")
+      .WhereGreaterThan("age", 18)
+      .OrderBy("name");
+
+// Get a specific page of results
+var page = await scope.GetPageAsync(
+    baseQuery: "SELECT * FROM `users`",
+    filter: filter,
+    pageNumber: 1,
+    pageSize: 20,
+    includeTotalCount: true  // Optional: get total count in parallel
+);
+
+// Access page data and metadata
+Console.WriteLine($"Page {page.PageNumber} of {page.TotalPages}");
+Console.WriteLine($"Items: {page.Items.Count}");
+Console.WriteLine($"Has Next: {page.HasNextPage}");
+Console.WriteLine($"Total Count: {page.TotalCount}");
+```
+
+### 5. Manual Pagination
 
 ```csharp
 var pagedResult = new PagedResult<User>(
@@ -154,6 +179,7 @@ See [playground/ToDos/README.md](playground/ToDos/README.md) for full documentat
 | Document | Description |
 |----------|-------------|
 | [Requirements](docs/requirements.md) | Complete feature specifications |
+| [Pagination Design](docs/PAGINATION_DESIGN.md) | GetPage design and implementation roadmap |
 | [Acceptance Tests Roadmap](docs/ACCEPTANCE_TESTS_ROADMAP.md) | Implementation plan |
 | [Requirements Audit](docs/REQUIREMENTS_AUDIT.md) | Implementation status audit |
 | [ToDos Demo](playground/ToDos/README.md) | Sample API documentation |

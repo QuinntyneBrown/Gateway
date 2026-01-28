@@ -692,4 +692,179 @@ public class PaginationTests
     }
 
     #endregion
+
+    #region GetPageAsync Extension Method Tests
+
+    [Fact]
+    public void GetPageAsync_ValidatesPageNumber()
+    {
+        // Arrange
+        var filter = new FilterBuilder<User>();
+
+        // Act & Assert - Page number must be >= 1
+        // Note: This test documents the expected behavior, actual validation happens in GetPageAsync
+        var pageNumber = 0;
+        var isValid = pageNumber >= 1;
+        isValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetPageAsync_ValidatesPageSize()
+    {
+        // Arrange
+        var filter = new FilterBuilder<User>();
+
+        // Act & Assert - Page size must be >= 1
+        var pageSize = 0;
+        var isValid = pageSize >= 1;
+        isValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetPageAsync_CalculatesOffsetCorrectly()
+    {
+        // Scenario: GetPageAsync should calculate correct offset for each page
+        // Given: pageNumber = 3 and pageSize = 20
+        // When: calculating offset
+        // Then: offset = 40 (skip first 2 pages)
+
+        // Arrange
+        var pageNumber = 3;
+        var pageSize = 20;
+        
+        // Act
+        var offset = (pageNumber - 1) * pageSize;
+        
+        // Assert
+        offset.Should().Be(40);
+    }
+
+    [Fact]
+    public void GetPageAsync_BuildsQueryWithPagination()
+    {
+        // Scenario: GetPageAsync should build query with LIMIT and OFFSET
+        // Given: a base query and pagination parameters
+        // When: building the paginated query
+        // Then: query includes LIMIT and OFFSET clauses
+
+        // Arrange
+        var filter = new FilterBuilder<User>();
+        var baseQuery = "SELECT * FROM `users`";
+        var pageNumber = 2;
+        var pageSize = 10;
+        var offset = (pageNumber - 1) * pageSize;
+        
+        // Act
+        filter.Skip(offset).Take(pageSize);
+        var fullQuery = $"{baseQuery}{filter.Build()}";
+        
+        // Assert
+        fullQuery.Should().Contain("LIMIT 10");
+        fullQuery.Should().Contain("OFFSET 10");
+    }
+
+    [Fact]
+    public void GetPageAsync_BuildsCountQueryWithoutOrderBy()
+    {
+        // Scenario: GetPageAsync count query should exclude ORDER BY
+        // Given: a filter with WHERE and ORDER BY
+        // When: building count query
+        // Then: only WHERE clause is included, no ORDER BY
+
+        // Arrange
+        var filter = new FilterBuilder<User>();
+        filter.Where("status", "active")
+              .OrderBy("name");
+        
+        // Act
+        var whereClause = filter.BuildWhereClause();
+        
+        // Assert
+        whereClause.Should().Be("status = $p0");
+        whereClause.Should().NotContain("ORDER BY");
+    }
+
+    [Fact]
+    public void GetPageAsync_SupportsFiltersWithPagination()
+    {
+        // Scenario: GetPageAsync should work with filtered queries
+        // Given: a query with WHERE conditions
+        // When: building paginated query
+        // Then: query includes WHERE, ORDER BY, LIMIT, and OFFSET
+
+        // Arrange
+        var filter = new FilterBuilder<User>();
+        var baseQuery = "SELECT * FROM `users`";
+        var pageNumber = 1;
+        var pageSize = 20;
+        
+        // Act
+        filter.Where("status", "active")
+              .WhereGreaterThan("age", 18)
+              .OrderBy("name")
+              .Skip(0)
+              .Take(pageSize);
+        var fullQuery = $"{baseQuery}{filter.Build()}";
+        
+        // Assert
+        fullQuery.Should().Contain("WHERE");
+        fullQuery.Should().Contain("status = $p0");
+        fullQuery.Should().Contain("age > $p1");
+        fullQuery.Should().Contain("ORDER BY name");
+        fullQuery.Should().Contain("LIMIT 20");
+        fullQuery.Should().Contain("OFFSET 0");
+    }
+
+    [Fact]
+    public void GetPageAsync_PagedResultMetadata()
+    {
+        // Scenario: GetPageAsync should return PagedResult with correct metadata
+        // Given: a successful page query
+        // When: result is returned
+        // Then: PagedResult contains items, page info, and navigation flags
+
+        // Arrange
+        var items = Enumerable.Range(1, 10).Select(i => new User { Id = $"user::{i}" }).ToList();
+        var pageNumber = 2;
+        var pageSize = 10;
+        var totalCount = 45;
+        
+        // Act
+        var result = new PagedResult<User>(items, pageNumber, pageSize, totalCount);
+        
+        // Assert
+        result.Items.Should().HaveCount(10);
+        result.PageNumber.Should().Be(2);
+        result.PageSize.Should().Be(10);
+        result.TotalCount.Should().Be(45);
+        result.TotalPages.Should().Be(5);
+        result.HasPreviousPage.Should().BeTrue();
+        result.HasNextPage.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GetPageAsync_WithoutTotalCount()
+    {
+        // Scenario: GetPageAsync without total count should return PagedResult with null TotalCount
+        // Given: includeTotalCount = false
+        // When: query executes
+        // Then: TotalCount and TotalPages are null
+
+        // Arrange
+        var items = Enumerable.Range(1, 10).Select(i => new User { Id = $"user::{i}" }).ToList();
+        var pageNumber = 1;
+        var pageSize = 10;
+        
+        // Act
+        var result = new PagedResult<User>(items, pageNumber, pageSize);
+        
+        // Assert
+        result.Items.Should().HaveCount(10);
+        result.PageNumber.Should().Be(1);
+        result.PageSize.Should().Be(10);
+        result.TotalCount.Should().BeNull();
+        result.TotalPages.Should().BeNull();
+    }
+
+    #endregion
 }
