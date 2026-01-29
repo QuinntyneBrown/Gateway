@@ -5,6 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>1998,4014,,SA1101,SA1600,,SA1200,SA1633,1591,SA1309</NoWarn>
+    
+    <!-- NuGet Package Metadata -->
+    <PackageId>QuinntyneBrown.Gateway.Core</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Quinntyne Brown</Authors>
+    <Description>Core library for Gateway framework providing mapping, filtering, and pagination utilities.</Description>
+    <PackageTags>gateway;mapper;filter;pagination</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CouchbaseNetClient" Version="3.6.3" />

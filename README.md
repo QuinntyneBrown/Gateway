@@ -15,7 +15,10 @@ A lightweight, high-performance Object Mapper for .NET that works with Couchbase
 ## Installation
 
 ```bash
-# Add project reference (NuGet package coming soon)
+# Install from NuGet
+dotnet add package QuinntyneBrown.Gateway.Core
+
+# Or add project reference
 dotnet add reference path/to/Gateway.Core.csproj
 ```
 
