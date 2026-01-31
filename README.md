@@ -186,6 +186,7 @@ See [playground/ToDos/README.md](playground/ToDos/README.md) for full documentat
 | [Acceptance Tests Roadmap](docs/ACCEPTANCE_TESTS_ROADMAP.md) | Implementation plan |
 | [Requirements Audit](docs/REQUIREMENTS_AUDIT.md) | Implementation status audit |
 | [ToDos Demo](playground/ToDos/README.md) | Sample API documentation |
+| [Benchmark Report](benchmarks/BENCHMARK_REPORT.md) | Performance benchmark results |
 
 ## Current Status
 
@@ -209,6 +210,35 @@ See [playground/ToDos/README.md](playground/ToDos/README.md) for full documentat
 | Pagination | 28 |
 | Performance | 10 |
 | Error Handling | 15 |
+
+## Performance
+
+Gateway.Core is designed for high performance with minimal memory allocation. Benchmarks are available in the [`benchmarks/`](benchmarks/) folder.
+
+### Key Benchmark Results
+
+| Component | Operation | Mean Time | Memory |
+|-----------|-----------|-----------|--------|
+| **ObjectMapper** | Map simple JSON to POCO | 275 ns | 192 B |
+| **ObjectMapper** | Map complex JSON to POCO | 2.8 µs | 2.8 KB |
+| **ObjectMapper** | Map 100 objects from array | 24 µs | 21.3 KB |
+| **FilterBuilder** | Single Where condition | 100 ns | 712 B |
+| **FilterBuilder** | Complex filter (7 conditions) | 456 ns | 2.6 KB |
+| **FilterBuilder** | Chain 50 conditions | 4.3 µs | 19.5 KB |
+| **PagedResult** | Create with any size | 3-4 ns | 48 B |
+| **PagedResult** | Access HasPreviousPage | <1 ns | 0 B |
+| **PaginationOptions** | GetEffectivePageSize | <1 ns | 0 B |
+
+*Benchmarked with BenchmarkDotNet v0.14.0 on .NET 9.0, Arm64 RyuJIT AdvSIMD*
+
+For detailed benchmark results, see [benchmarks/BENCHMARK_REPORT.md](benchmarks/BENCHMARK_REPORT.md).
+
+### Running Benchmarks
+
+```bash
+cd benchmarks/Gateway.Benchmarks
+dotnet run -c Release
+```
 
 ## Requirements
 
