@@ -1,0 +1,139 @@
+<div class="main-content">
+  @if (loading()) {
+    <div style="display: flex; justify-content: center; padding: 2rem;">
+      <mat-progress-spinner mode="indeterminate" diameter="50"></mat-progress-spinner>
+    </div>
+  } @else {
+    <div class="page-header">
+      <div class="page-header__info">
+        <h2 class="page-title">
+          @if (isCreateMode()) {
+            Create File Metadata
+          } @else if (isEditMode()) {
+            Edit File Metadata
+          } @else {
+            File Metadata Details
+          }
+        </h2>
+        <p class="page-subtitle">
+          @if (metadata()) {
+            {{ metadata()!.fileName }}
+          }
+        </p>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        @if (!isEditMode() && !isCreateMode() && metadataId()) {
+          <button mat-raised-button [routerLink]="['/metadata', metadataId(), 'edit']">
+            <mat-icon>edit</mat-icon>
+            Edit
+          </button>
+          <button mat-raised-button color="warn" (click)="onDelete()">
+            <mat-icon>delete</mat-icon>
+            Delete
+          </button>
+        }
+        @if (isEditMode() || isCreateMode()) {
+          <button mat-raised-button (click)="onCancel()">
+            <mat-icon>close</mat-icon>
+            Cancel
+          </button>
+          <button mat-raised-button color="primary" (click)="onSave()" [disabled]="metadataForm.invalid">
+            <mat-icon>save</mat-icon>
+            Save
+          </button>
+        }
+      </div>
+    </div>
+
+    <form [formGroup]="metadataForm">
+      <mat-card style="margin-bottom: 24px;">
+        <mat-card-header>
+          <mat-card-title>File Information</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>File Name</mat-label>
+              <input matInput formControlName="fileName" required>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Content Type</mat-label>
+              <input matInput formControlName="contentType" required>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>File Size (bytes)</mat-label>
+              <input matInput type="number" formControlName="fileSize" required>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>File Type</mat-label>
+              <mat-select formControlName="fileType" required>
+                <mat-option [value]="0">Document</mat-option>
+                <mat-option [value]="1">Image</mat-option>
+                <mat-option [value]="2">Video</mat-option>
+                <mat-option [value]="3">Audio</mat-option>
+                <mat-option [value]="4">Archive</mat-option>
+                <mat-option [value]="5">Other</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Storage Path</mat-label>
+              <input matInput formControlName="storagePath" required>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Version</mat-label>
+              <input matInput formControlName="version" required>
+            </mat-form-field>
+
+            @if (isCreateMode()) {
+              <mat-form-field appearance="outline">
+                <mat-label>Uploaded By</mat-label>
+                <input matInput formControlName="uploadedBy" required>
+              </mat-form-field>
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      @if (metadata() && !isEditMode()) {
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>Metadata</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-item__label">ID</div>
+                <div class="info-item__value monospace">{{ metadata()!.id }}</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-item__label">Uploaded By</div>
+                <div class="info-item__value">{{ metadata()!.uploadedBy }}</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-item__label">Uploaded At</div>
+                <div class="info-item__value">{{ formatDate(metadata()!.uploadedAt) }}</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-item__label">Modified At</div>
+                <div class="info-item__value">{{ formatDate(metadata()!.modifiedAt) }}</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-item__label">File Size</div>
+                <div class="info-item__value">{{ formatFileSize(metadata()!.fileSize) }}</div>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+    </form>
+  }
+</div>

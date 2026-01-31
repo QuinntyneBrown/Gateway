@@ -1,0 +1,110 @@
+<div class="main-content">
+  <div class="page-header">
+    <div class="page-header__info">
+      <h2 class="page-title">File Metadata</h2>
+      <p class="page-subtitle">Manage file metadata records</p>
+    </div>
+    <button mat-raised-button color="primary" [routerLink]="['/metadata/create']">
+      <mat-icon>add</mat-icon>
+      Add Metadata
+    </button>
+  </div>
+
+  <mat-card class="filter-bar">
+    <mat-form-field appearance="outline">
+      <mat-label>File Type</mat-label>
+      <mat-select [(ngModel)]="fileTypeFilter" (selectionChange)="onFilterChange()">
+        <mat-option [value]="undefined">All Types</mat-option>
+        <mat-option [value]="0">Document</mat-option>
+        <mat-option [value]="1">Image</mat-option>
+        <mat-option [value]="2">Video</mat-option>
+        <mat-option [value]="3">Audio</mat-option>
+        <mat-option [value]="4">Archive</mat-option>
+        <mat-option [value]="5">Other</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </mat-card>
+
+  @if (loading()) {
+    <div style="display: flex; justify-content: center; padding: 2rem;">
+      <mat-progress-spinner mode="indeterminate" diameter="50"></mat-progress-spinner>
+    </div>
+  } @else {
+    <mat-card>
+      <table mat-table [dataSource]="dataSource()" class="mat-elevation-z0">
+        <ng-container matColumnDef="fileName">
+          <th mat-header-cell *matHeaderCellDef>File Name</th>
+          <td mat-cell *matCellDef="let element">{{ element.fileName }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="contentType">
+          <th mat-header-cell *matHeaderCellDef>Content Type</th>
+          <td mat-cell *matCellDef="let element">{{ element.contentType }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="fileSize">
+          <th mat-header-cell *matHeaderCellDef>Size</th>
+          <td mat-cell *matCellDef="let element">{{ formatFileSize(element.fileSize) }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="fileType">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let element">
+            @switch (element.fileType) {
+              @case (0) { Document }
+              @case (1) { Image }
+              @case (2) { Video }
+              @case (3) { Audio }
+              @case (4) { Archive }
+              @default { Other }
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="uploadedAt">
+          <th mat-header-cell *matHeaderCellDef>Uploaded At</th>
+          <td mat-cell *matCellDef="let element">{{ formatDate(element.uploadedAt) }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="uploadedBy">
+          <th mat-header-cell *matHeaderCellDef>Uploaded By</th>
+          <td mat-cell *matCellDef="let element">{{ element.uploadedBy }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let element">
+            <div class="actions-cell">
+              <button mat-icon-button [routerLink]="['/metadata', element.id]" matTooltip="View Details">
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button mat-icon-button [routerLink]="['/metadata', element.id, 'edit']" matTooltip="Edit">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="onDelete(element.id)" matTooltip="Delete">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+
+      <div class="pagination">
+        <div class="pagination__info">
+          Page {{ pageNumber() }}
+        </div>
+        <div class="pagination__controls">
+          <button mat-icon-button [disabled]="!hasPreviousPage()" (click)="previousPage()">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <button mat-icon-button [disabled]="!hasNextPage()" (click)="nextPage()">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+      </div>
+    </mat-card>
+  }
+</div>
