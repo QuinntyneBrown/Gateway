@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using Couchbase;
+using Couchbase.Core.IO.Serializers;
 using Couchbase.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public static class DependencyInjection
             options.ConnectionString = configuration["Couchbase:ConnectionString"] ?? "couchbase://localhost";
             options.UserName = configuration["Couchbase:UserName"] ?? "Administrator";
             options.Password = configuration["Couchbase:Password"] ?? "password";
+            options.Serializer = SystemTextJsonSerializer.Create();
         });
 
         // Configure Gateway SimpleMapper
